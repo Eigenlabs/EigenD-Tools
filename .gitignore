@@ -1,0 +1,11 @@
+env.sh
+env.cmd
+*.pyc
+tags
+tmp
+.sconsign.dblite
+*.lnk
+.DS_Store
+vc100.pdb
+vc90.pdb
+*.swp
