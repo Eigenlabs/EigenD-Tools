@@ -10,7 +10,7 @@ selection method.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -32,7 +32,9 @@ selection method.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/ifort.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Tool/ifort.py 4577 2009/12/27 19:43:56 scons"
+
+import string
 
 import SCons.Defaults
 from SCons.Scanner.Fortran import FortranScan
@@ -46,12 +48,12 @@ def generate(env):
     SCons.Tool.SourceFileScanner.add_scanner('.i', fscan)
     SCons.Tool.SourceFileScanner.add_scanner('.i90', fscan)
 
-    if 'FORTRANFILESUFFIXES' not in env:
+    if not env.has_key('FORTRANFILESUFFIXES'):
         env['FORTRANFILESUFFIXES'] = ['.i']
     else:
         env['FORTRANFILESUFFIXES'].append('.i')
 
-    if 'F90FILESUFFIXES' not in env:
+    if not env.has_key('F90FILESUFFIXES'):
         env['F90FILESUFFIXES'] = ['.i90']
     else:
         env['F90FILESUFFIXES'].append('.i90')
@@ -73,7 +75,7 @@ def generate(env):
         for dialect in ['F77', 'F90', 'FORTRAN', 'F95']:
             for var in ['%sCOM' % dialect, '%sPPCOM' % dialect,
                         'SH%sCOM' % dialect, 'SH%sPPCOM' % dialect]:
-                env[var] = env[var].replace('-o $TARGET', '-object:$TARGET')
+                env[var] = string.replace(env[var], '-o $TARGET', '-object:$TARGET')
         env['FORTRANMODDIRPREFIX'] = "/module:"
     else:
         env['FORTRANMODDIRPREFIX'] = "-module "

@@ -101,6 +101,7 @@ Autoconf-like configuration support; low level implementation of tests.
 #
 
 import re
+import string
 from types import IntType
 
 #
@@ -156,7 +157,7 @@ def CheckCC(context):
     too, so that it can test against non working flags.
 
     """
-    context.Display("Checking whether the C compiler works... ")
+    context.Display("Checking whether the C compiler works")
     text = """
 int main()
 {
@@ -176,7 +177,7 @@ def CheckSHCC(context):
     too, so that it can test against non working flags.
 
     """
-    context.Display("Checking whether the (shared) C compiler works... ")
+    context.Display("Checking whether the (shared) C compiler works")
     text = """
 int foo()
 {
@@ -196,7 +197,7 @@ def CheckCXX(context):
     too, so that it can test against non working flags.
 
     """
-    context.Display("Checking whether the C++ compiler works... ")
+    context.Display("Checking whether the C++ compiler works")
     text = """
 int main()
 {
@@ -216,7 +217,7 @@ def CheckSHCXX(context):
     too, so that it can test against non working flags.
 
     """
-    context.Display("Checking whether the (shared) C++ compiler works... ")
+    context.Display("Checking whether the (shared) C++ compiler works")
     text = """
 int main()
 {
@@ -229,7 +230,7 @@ int main()
 
 def _check_empty_program(context, comp, text, language, use_shared = False):
     """Return 0 on success, 1 otherwise."""
-    if comp not in context.env or not context.env[comp]:
+    if not context.env.has_key(comp) or not context.env[comp]:
         # The compiler construction variable is not set or empty
         return 1
 
@@ -554,7 +555,7 @@ def CheckDeclaration(context, symbol, includes = None, language = None):
 
     lang, suffix, msg = _lang2suffix(language)
     if msg:
-        context.Display("Cannot check for declaration %s: %s\n" % (symbol, msg))
+        context.Display("Cannot check for declaration %s: %s\n" % (type_name, msg))
         return msg
 
     src = includetext + includes 
@@ -635,7 +636,7 @@ return 0;
 """ % (call or "")
 
     if call:
-        i = call.find("\n")
+        i = string.find(call, "\n")
         if i > 0:
             calltext = call[:i] + ".."
         elif call[-1] == ';':
@@ -722,14 +723,14 @@ def _Have(context, key, have, comment = None):
              Give "have" as is should appear in the header file, include quotes
              when desired and escape special characters!
     """
-    key_up = key.upper()
+    key_up = string.upper(key)
     key_up = re.sub('[^A-Z0-9_]', '_', key_up)
     context.havedict[key_up] = have
     if have == 1:
         line = "#define %s 1\n" % key_up
     elif have == 0:
         line = "/* #undef %s */\n" % key_up
-    elif isinstance(have, IntType):
+    elif type(have) == IntType:
         line = "#define %s %d\n" % (key_up, have)
     else:
         line = "#define %s %s\n" % (key_up, str(have))
@@ -754,7 +755,7 @@ def _LogFailed(context, text, msg):
     """
     if LogInputFiles:
         context.Log("Failed program was:\n")
-        lines = text.split('\n')
+        lines = string.split(text, '\n')
         if len(lines) and lines[-1] == '':
             lines = lines[:-1]              # remove trailing empty line
         n = 1

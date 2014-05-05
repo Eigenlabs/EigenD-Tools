@@ -1,14 +1,12 @@
 # dblite.py module contributed by Ralf W. Grosse-Kunstleve.
 # Extended for Unicode by Steven Knight.
 
-import SCons.compat
-
-import builtins
-import os
-# compat layer imports "cPickle" for us if it's available.
-import pickle
-import shutil
+import cPickle
 import time
+import shutil
+import os
+import types
+import __builtin__
 
 keep_all_files = 00000
 ignore_corrupt_dbfiles = 0
@@ -16,13 +14,13 @@ ignore_corrupt_dbfiles = 0
 def corruption_warning(filename):
     print "Warning: Discarding corrupt database:", filename
 
-try: unicode
-except NameError:
+if hasattr(types, 'UnicodeType'):
     def is_string(s):
-        return isinstance(s, str)
+        t = type(s)
+        return t is types.StringType or t is types.UnicodeType
 else:
     def is_string(s):
-        return type(s) in (str, unicode)
+        return type(s) is types.StringType
 
 try:
     unicode('a')
@@ -32,7 +30,7 @@ except NameError:
 dblite_suffix = '.dblite'
 tmp_suffix = '.tmp'
 
-class dblite(object):
+class dblite:
 
   # Squirrel away references to the functions in various modules
   # that we'll use when our __del__() method calls our sync() method
@@ -44,8 +42,8 @@ class dblite(object):
   # See the discussion at:
   #   http://mail.python.org/pipermail/python-bugs-list/2003-March/016877.html
 
-  _open = builtins.open
-  _pickle_dump = staticmethod(pickle.dump)
+  _open = __builtin__.open
+  _cPickle_dump = cPickle.dump
   _os_chmod = os.chmod
   try:
       _os_chown = os.chown
@@ -98,23 +96,20 @@ class dblite(object):
         p = f.read()
         if (len(p) > 0):
           try:
-            self._dict = pickle.loads(p)
-          except (pickle.UnpicklingError, EOFError):
+            self._dict = cPickle.loads(p)
+          except (cPickle.UnpicklingError, EOFError):
             if (ignore_corrupt_dbfiles == 0): raise
             if (ignore_corrupt_dbfiles == 1):
               corruption_warning(self._file_name)
 
-  def close(self):
+  def __del__(self):
     if (self._needs_sync):
       self.sync()
-
-  def __del__(self):
-    self.close()
 
   def sync(self):
     self._check_writable()
     f = self._open(self._tmp_name, "wb", self._mode)
-    self._pickle_dump(self._dict, f, 1)
+    self._cPickle_dump(self._dict, f, 1)
     f.close()
     # Windows doesn't allow renaming if the file exists, so unlink
     # it first, chmod'ing it to make sure we can do so.  On UNIX, we
@@ -147,14 +142,14 @@ class dblite(object):
   def __setitem__(self, key, value):
     self._check_writable()
     if (not is_string(key)):
-      raise TypeError("key `%s' must be a string but is %s" % (key, type(key)))
+      raise TypeError, "key `%s' must be a string but is %s" % (key, type(key))
     if (not is_string(value)):
-      raise TypeError("value `%s' must be a string but is %s" % (value, type(value)))
+      raise TypeError, "value `%s' must be a string but is %s" % (value, type(value))
     self._dict[key] = value
     self._needs_sync = 0001
 
   def keys(self):
-    return list(self._dict.keys())
+    return self._dict.keys()
 
   def has_key(self, key):
     return key in self._dict
@@ -163,8 +158,7 @@ class dblite(object):
     return key in self._dict
 
   def iterkeys(self):
-    # Wrapping name in () prevents fixer from "fixing" this
-    return (self._dict.iterkeys)()
+    return self._dict.iterkeys()
 
   __iter__ = iterkeys
 
@@ -201,7 +195,7 @@ def _exercise():
   except IOError, e:
     assert str(e) == "Read-only database: tmp.dblite"
   else:
-    raise RuntimeError("IOError expected.")
+    raise RuntimeError, "IOError expected."
   db = open("tmp", "w")
   assert len(db) == 4
   db["ping"] = "pong"
@@ -211,26 +205,26 @@ def _exercise():
   except TypeError, e:
     assert str(e) == "key `(1, 2)' must be a string but is <type 'tuple'>", str(e)
   else:
-    raise RuntimeError("TypeError exception expected")
+    raise RuntimeError, "TypeError exception expected"
   try:
     db["list"] = [1,2]
   except TypeError, e:
     assert str(e) == "value `[1, 2]' must be a string but is <type 'list'>", str(e)
   else:
-    raise RuntimeError("TypeError exception expected")
+    raise RuntimeError, "TypeError exception expected"
   db = open("tmp", "r")
   assert len(db) == 5
   db = open("tmp", "n")
   assert len(db) == 0
-  dblite._open("tmp.dblite", "w")
+  _open("tmp.dblite", "w")
   db = open("tmp", "r")
-  dblite._open("tmp.dblite", "w").write("x")
+  _open("tmp.dblite", "w").write("x")
   try:
     db = open("tmp", "r")
-  except pickle.UnpicklingError:
+  except cPickle.UnpicklingError:
     pass
   else:
-    raise RuntimeError("pickle exception expected.")
+    raise RuntimeError, "cPickle exception expected."
   global ignore_corrupt_dbfiles
   ignore_corrupt_dbfiles = 2
   db = open("tmp", "r")
@@ -241,7 +235,7 @@ def _exercise():
   except IOError, e:
     assert str(e) == "[Errno 2] No such file or directory: 'tmp.dblite'", str(e)
   else:
-    raise RuntimeError("IOError expected.")
+    raise RuntimeError, "IOError expected."
   print "OK"
 
 if (__name__ == "__main__"):

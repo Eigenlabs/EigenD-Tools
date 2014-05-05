@@ -8,7 +8,7 @@ selection method.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -30,10 +30,11 @@ selection method.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/mwcc.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Tool/mwcc.py 4577 2009/12/27 19:43:56 scons"
 
 import os
 import os.path
+import string
 
 import SCons.Util
 
@@ -79,8 +80,8 @@ def set_vars(env):
     ENV['CWFolder'] = version.path
     ENV['LM_LICENSE_FILE'] = version.license
     plus = lambda x: '+%s' % x
-    ENV['MWCIncludes'] = os.pathsep.join(map(plus, version.includes))
-    ENV['MWLibraries'] = os.pathsep.join(map(plus, version.libs))
+    ENV['MWCIncludes'] = string.join(map(plus, version.includes), os.pathsep)
+    ENV['MWLibraries'] = string.join(map(plus, version.libs), os.pathsep)
     return 1
 
 
@@ -99,7 +100,7 @@ def find_versions():
             product_key = SCons.Util.RegOpenKeyEx(HLM, product)
 
             i = 0
-            while True:
+            while 1:
                 name = product + '\\' + SCons.Util.RegEnumKey(product_key, i)
                 name_key = SCons.Util.RegOpenKeyEx(HLM, name)
 
@@ -119,7 +120,7 @@ def find_versions():
     return versions
 
 
-class MWVersion(object):
+class MWVersion:
     def __init__(self, version, path, platform):
         self.version = version
         self.path = path

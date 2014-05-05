@@ -54,8 +54,29 @@ what's tested is actually `z in y'.
 # - Raymond Hettinger added a number of speedups and other
 #   improvements.
 
-# protect this import from the fixers...
-exec('from itertools import ifilterfalse as filterfalse')
+from __future__ import generators
+try:
+    from itertools import ifilter, ifilterfalse
+except ImportError:
+    # Code to make the module run under Py2.2
+    def ifilter(predicate, iterable):
+        if predicate is None:
+            def predicate(x):
+                return x
+        for x in iterable:
+            if predicate(x):
+                yield x
+    def ifilterfalse(predicate, iterable):
+        if predicate is None:
+            def predicate(x):
+                return x
+        for x in iterable:
+            if not predicate(x):
+                yield x
+    try:
+        True, False
+    except NameError:
+        True, False = (0==0, 0!=0)
 
 __all__ = ['BaseSet', 'Set', 'ImmutableSet']
 
@@ -70,7 +91,7 @@ class BaseSet(object):
         """This is an abstract class."""
         # Don't call this from a concrete subclass!
         if self.__class__ is BaseSet:
-            raise TypeError("BaseSet is an abstract class.  "
+            raise TypeError, ("BaseSet is an abstract class.  "
                               "Use Set or ImmutableSet.")
 
     # Standard protocols: __len__, __repr__, __str__, __iter__
@@ -89,9 +110,9 @@ class BaseSet(object):
     # __str__ is the same as __repr__
     __str__ = __repr__
 
-    def _repr(self, sort_them=False):
-        elements = list(self._data.keys())
-        if sort_them:
+    def _repr(self, sorted=False):
+        elements = self._data.keys()
+        if sorted:
             elements.sort()
         return '%s(%r)' % (self.__class__.__name__, elements)
 
@@ -100,8 +121,7 @@ class BaseSet(object):
 
         This is the keys iterator for the underlying dict.
         """
-        # Wrapping name in () prevents fixer from "fixing" this
-        return (self._data.iterkeys)()
+        return self._data.iterkeys()
 
     # Three-way comparison is not supported.  However, because __eq__ is
     # tried before __cmp__, if Set x == Set y, x.__eq__(y) returns True and
@@ -109,7 +129,7 @@ class BaseSet(object):
     # case).
 
     def __cmp__(self, other):
-        raise TypeError("can't compare sets using cmp()")
+        raise TypeError, "can't compare sets using cmp()"
 
     # Equality comparisons using the underlying dicts.  Mixed-type comparisons
     # are allowed here, where Set == z for non-Set z always returns False,
@@ -211,7 +231,7 @@ class BaseSet(object):
             little, big = self, other
         else:
             little, big = other, self
-        common = iter(filter(big._data.has_key, little))
+        common = ifilter(big._data.has_key, little)
         return self.__class__(common)
 
     def __xor__(self, other):
@@ -236,9 +256,9 @@ class BaseSet(object):
             otherdata = other._data
         except AttributeError:
             otherdata = Set(other)._data
-        for elt in filterfalse(otherdata.has_key, selfdata):
+        for elt in ifilterfalse(otherdata.has_key, selfdata):
             data[elt] = value
-        for elt in filterfalse(selfdata.has_key, otherdata):
+        for elt in ifilterfalse(selfdata.has_key, otherdata):
             data[elt] = value
         return result
 
@@ -263,7 +283,7 @@ class BaseSet(object):
         except AttributeError:
             otherdata = Set(other)._data
         value = True
-        for elt in filterfalse(otherdata.has_key, self):
+        for elt in ifilterfalse(otherdata.has_key, self):
             data[elt] = value
         return result
 
@@ -289,7 +309,7 @@ class BaseSet(object):
         self._binary_sanity_check(other)
         if len(self) > len(other):  # Fast check for obvious cases
             return False
-        for elt in filterfalse(other._data.has_key, self):
+        for elt in ifilterfalse(other._data.has_key, self):
             return False
         return True
 
@@ -298,7 +318,7 @@ class BaseSet(object):
         self._binary_sanity_check(other)
         if len(self) < len(other):  # Fast check for obvious cases
             return False
-        for elt in filterfalse(self._data.has_key, other):
+        for elt in ifilterfalse(self._data.has_key, other):
             return False
         return True
 
@@ -320,7 +340,7 @@ class BaseSet(object):
         # Check that the other argument to a binary operation is also
         # a set, raising a TypeError otherwise.
         if not isinstance(other, BaseSet):
-            raise TypeError("Binary operation only permitted between sets")
+            raise TypeError, "Binary operation only permitted between sets"
 
     def _compute_hash(self):
         # Calculate hash code for a set by xor'ing the hash codes of
@@ -418,7 +438,7 @@ class Set(BaseSet):
     def __hash__(self):
         """A Set cannot be hashed."""
         # We inherit object.__hash__, so we must deny this explicitly
-        raise TypeError("Can't hash a Set, only an ImmutableSet.")
+        raise TypeError, "Can't hash a Set, only an ImmutableSet."
 
     # In-place union, intersection, differences.
     # Subtle:  The xyz_update() functions deliberately return None,
@@ -481,7 +501,7 @@ class Set(BaseSet):
             other = Set(other)
         if self is other:
             self.clear()
-        for elt in filter(data.has_key, other):
+        for elt in ifilter(data.has_key, other):
             del data[elt]
 
     # Python dict-like mass mutations: update, clear

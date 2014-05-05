@@ -7,7 +7,7 @@ stop, and wait on jobs.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -29,9 +29,7 @@ stop, and wait on jobs.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Job.py  2014/03/02 14:18:15 garyo"
-
-import SCons.compat
+__revision__ = "src/engine/SCons/Job.py 4577 2009/12/27 19:43:56 scons"
 
 import os
 import signal
@@ -52,7 +50,7 @@ default_stack_size = 256
 interrupt_msg = 'Build interrupted.'
 
 
-class InterruptState(object):
+class InterruptState:
    def __init__(self):
        self.interrupted = False
 
@@ -63,7 +61,7 @@ class InterruptState(object):
        return self.interrupted
 
 
-class Jobs(object):
+class Jobs:
     """An instance of this class initializes N jobs, and provides
     methods for starting, stopping, and waiting on all N jobs.
     """
@@ -129,7 +127,7 @@ class Jobs(object):
         turns out that it very difficult to stop the build process
         by throwing asynchronously an exception such as
         KeyboardInterrupt. For example, the python Condition
-        variables (threading.Condition) and queue's do not seem to
+        variables (threading.Condition) and Queue's do not seem to
         asynchronous-exception-safe. It would require adding a whole
         bunch of try/finally block and except KeyboardInterrupt all
         over the place.
@@ -163,7 +161,7 @@ class Jobs(object):
         except AttributeError:
             pass
 
-class Serial(object):
+class Serial:
     """This class is used to execute tasks in series, and is more efficient
     than Parallel, but is only appropriate for non-parallel builds. Only
     one instance of this class should be in existence at a time.
@@ -189,7 +187,7 @@ class Serial(object):
         fails to execute (i.e. execute() raises an exception), then the job will
         stop."""
         
-        while True:
+        while 1:
             task = self.taskmaster.next_task()
 
             if task is None:
@@ -223,7 +221,7 @@ class Serial(object):
 # Parallel class (and its dependent classes) will work if the interpreter
 # doesn't support threads.
 try:
-    import queue
+    import Queue
     import threading
 except ImportError:
     pass
@@ -242,7 +240,7 @@ else:
             self.start()
 
         def run(self):
-            while True:
+            while 1:
                 task = self.requestQueue.get()
 
                 if task is None:
@@ -264,7 +262,7 @@ else:
 
                 self.resultsQueue.put((task, ok))
 
-    class ThreadPool(object):
+    class ThreadPool:
         """This class is responsible for spawning and managing worker threads."""
 
         def __init__(self, num, stack_size, interrupted):
@@ -273,8 +271,8 @@ else:
             One must specify the stack size of the worker threads. The
             stack size is specified in kilobytes.
             """
-            self.requestQueue = queue.Queue(0)
-            self.resultsQueue = queue.Queue(0)
+            self.requestQueue = Queue.Queue(0)
+            self.resultsQueue = Queue.Queue(0)
 
             try:
                 prev_size = threading.stack_size(stack_size*1024) 
@@ -295,7 +293,9 @@ else:
                 worker = Worker(self.requestQueue, self.resultsQueue, interrupted)
                 self.workers.append(worker)
 
-            if 'prev_size' in locals():
+            # Once we drop Python 1.5 we can change the following to:
+            #if 'prev_size' in locals():
+            if 'prev_size' in locals().keys():
                 threading.stack_size(prev_size)
 
         def put(self, task):
@@ -338,7 +338,7 @@ else:
                 worker.join(1.0)
             self.workers = []
 
-    class Parallel(object):
+    class Parallel:
         """This class is used to execute tasks in parallel, and is somewhat 
         less efficient than Serial, but is appropriate for parallel builds.
 
@@ -374,7 +374,7 @@ else:
 
             jobs = 0
             
-            while True:
+            while 1:
                 # Start up as many available tasks as we're
                 # allowed to.
                 while jobs < self.maxjobs:
@@ -402,7 +402,7 @@ else:
 
                 # Let any/all completed tasks finish up before we go
                 # back and put the next batch of tasks on the queue.
-                while True:
+                while 1:
                     task, ok = self.tp.get()
                     jobs = jobs - 1
 

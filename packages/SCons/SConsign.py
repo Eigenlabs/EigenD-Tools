@@ -5,7 +5,7 @@ Writing and reading information to the .sconsign file or files.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,13 +27,11 @@ Writing and reading information to the .sconsign file or files.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/SConsign.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/SConsign.py 4577 2009/12/27 19:43:56 scons"
 
-import SCons.compat
-
+import cPickle
 import os
-# compat layer imports "cPickle" for us if it's available.
-import pickle
+import os.path
 
 import SCons.dblite
 import SCons.Warnings
@@ -104,17 +102,11 @@ def write():
         try:
             syncmethod = db.sync
         except AttributeError:
-            pass # Not all dbm modules have sync() methods.
+            pass # Not all anydbm modules have sync() methods.
         else:
             syncmethod()
-        try:
-            closemethod = db.close
-        except AttributeError:
-            pass # Not all dbm modules have close() methods.
-        else:
-            closemethod()
 
-class SConsignEntry(object):
+class SConsignEntry:
     """
     Wrapper class for the generic entry in a .sconsign file.
     The Node subclass populates it with attributes as it pleases.
@@ -132,7 +124,7 @@ class SConsignEntry(object):
     def convert_from_sconsign(self, dir, name):
         self.binfo.convert_from_sconsign(dir, name)
 
-class Base(object):
+class Base:
     """
     This is the controlling class for the signatures for the collection of
     entries associated with a specific directory.  The actual directory
@@ -209,8 +201,8 @@ class DB(Base):
             pass
         else:
             try:
-                self.entries = pickle.loads(rawentries)
-                if not isinstance(self.entries, dict):
+                self.entries = cPickle.loads(rawentries)
+                if type(self.entries) is not type({}):
                     self.entries = {}
                     raise TypeError
             except KeyboardInterrupt:
@@ -247,7 +239,7 @@ class DB(Base):
         path = normcase(self.dir.path)
         for key, entry in self.entries.items():
             entry.convert_to_sconsign()
-        db[path] = pickle.dumps(self.entries, 1)
+        db[path] = cPickle.dumps(self.entries, 1)
 
         if sync:
             try:
@@ -268,8 +260,8 @@ class Dir(Base):
         if not fp:
             return
 
-        self.entries = pickle.load(fp)
-        if not isinstance(self.entries, dict):
+        self.entries = cPickle.load(fp)
+        if type(self.entries) is not type({}):
             self.entries = {}
             raise TypeError
 
@@ -335,7 +327,7 @@ class DirFile(Dir):
                 return
         for key, entry in self.entries.items():
             entry.convert_to_sconsign()
-        pickle.dump(self.entries, file, 1)
+        cPickle.dump(self.entries, file, 1)
         file.close()
         if fname != self.sconsign:
             try:

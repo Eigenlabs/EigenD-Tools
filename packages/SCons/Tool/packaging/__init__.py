@@ -4,7 +4,7 @@ SCons Packaging Tool.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -24,8 +24,9 @@ SCons Packaging Tool.
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
 
-__revision__ = "src/engine/SCons/Tool/packaging/__init__.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Tool/packaging/__init__.py 4577 2009/12/27 19:43:56 scons"
 
 import SCons.Environment
 from SCons.Variables import *
@@ -57,7 +58,7 @@ def Tag(env, target, source, *more_tags, **kw_tags):
         kw_tags[first_tag[0]] = ''
 
     if len(kw_tags) == 0 and len(more_tags) == 0:
-        raise UserError("No tags given.")
+        raise UserError, "No tags given."
 
     # XXX: sanity checks
     for x in more_tags:
@@ -90,7 +91,7 @@ def Package(env, target=None, source=None, **kw):
         source = env.FindInstalledFiles()
 
     if len(source)==0:
-        raise UserError("No source for Package() given")
+        raise UserError, "No source for Package() given"
 
     # decide which types of packages shall be built. Can be defined through
     # four mechanisms: command line argument, keyword argument,
@@ -104,16 +105,16 @@ def Package(env, target=None, source=None, **kw):
         kw['PACKAGETYPE'] = GetOption('package_type')
 
     if kw['PACKAGETYPE'] == None:
-        if 'Tar' in env['BUILDERS']:
+        if env['BUILDERS'].has_key('Tar'):
             kw['PACKAGETYPE']='targz'
-        elif 'Zip' in env['BUILDERS']:
+        elif env['BUILDERS'].has_key('Zip'):
             kw['PACKAGETYPE']='zip'
         else:
-            raise UserError("No type for Package() given")
+            raise UserError, "No type for Package() given"
 
     PACKAGETYPE=kw['PACKAGETYPE']
     if not is_List(PACKAGETYPE):
-        PACKAGETYPE=PACKAGETYPE.split(',')
+        PACKAGETYPE=string.split(PACKAGETYPE, ',')
 
     # load the needed packagers.
     def load_packager(type):
@@ -123,7 +124,7 @@ def Package(env, target=None, source=None, **kw):
         except ImportError, e:
             raise EnvironmentError("packager %s not available: %s"%(type,str(e)))
 
-    packagers=list(map(load_packager, PACKAGETYPE))
+    packagers=map(load_packager, PACKAGETYPE)
 
     # set up targets and the PACKAGEROOT
     try:
@@ -138,7 +139,7 @@ def Package(env, target=None, source=None, **kw):
             default_target = default_name%kw
             target.extend( [default_target]*size_diff )
 
-        if 'PACKAGEROOT' not in kw:
+        if not kw.has_key('PACKAGEROOT'):
             kw['PACKAGEROOT'] = default_name%kw
 
     except KeyError, e:
@@ -152,7 +153,7 @@ def Package(env, target=None, source=None, **kw):
     try:
         for packager in packagers:
             t=[target.pop(0)]
-            t=packager.package(env,t,source, **kw)
+            t=apply(packager.package, [env,t,source], kw)
             targets.extend(t)
 
         assert( len(target) == 0 )
@@ -172,7 +173,8 @@ def Package(env, target=None, source=None, **kw):
         args.remove('target')
         args.remove('source')
         # now remove any args for which we have a value in kw.
-        args=[x for x in args if x not in kw]
+        #args=[x for x in args if not kw.has_key(x)]
+        args=filter(lambda x, kw=kw: not kw.has_key(x), args)
 
         if len(args)==0:
             raise # must be a different error, so reraise
@@ -220,7 +222,7 @@ def options(opts):
     opts.AddVariables(
         EnumVariable( 'PACKAGETYPE',
                      'the type of package to create.',
-                     None, allowed_values=list(map( str, __all__ )),
+                     None, allowed_values=map( str, __all__ ),
                      ignorecase=2
                   )
     )
@@ -234,8 +236,8 @@ def copy_attr(f1, f2):
     """
     #pattrs = [x for x in dir(f1) if not hasattr(f2, x) and\
     #                                x.startswith('PACKAGING_')]
-    copyit = lambda x: not hasattr(f2, x) and x[:10] == 'PACKAGING_'
-    pattrs = list(filter(copyit, dir(f1)))
+    copyit = lambda x, f2=f2: not hasattr(f2, x) and x[:10] == 'PACKAGING_'
+    pattrs = filter(copyit, dir(f1))
     for attr in pattrs:
         setattr(f2, attr, getattr(f1, attr))
 def putintopackageroot(target, source, env, pkgroot, honor_install_location=1):
@@ -289,7 +291,7 @@ def stripinstallbuilder(target, source, env):
             (file.builder.name=="InstallBuilder" or\
              file.builder.name=="InstallAsBuilder"))
 
-    if len(list(filter(has_no_install_location, source))):
+    if len(filter(has_no_install_location, source)):
         warn(Warning, "there are files to package which have no\
         InstallBuilder attached, this might lead to irreproducible packages")
 

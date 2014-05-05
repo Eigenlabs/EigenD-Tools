@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/PathList.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/PathList.py 4577 2009/12/27 19:43:56 scons"
 
 __doc__ = """SCons.PathList
 
@@ -33,6 +33,7 @@ Do the Right Thing (almost) regardless of how the variable is specified.
 """
 
 import os
+import string
 
 import SCons.Memoize
 import SCons.Node
@@ -66,7 +67,7 @@ def node_conv(obj):
         result = get()
     return result
 
-class _PathList(object):
+class _PathList:
     """
     An actual PathList object.
     """
@@ -97,14 +98,14 @@ class _PathList(object):
         over and over for each target.
         """
         if SCons.Util.is_String(pathlist):
-            pathlist = pathlist.split(os.pathsep)
+            pathlist = string.split(pathlist, os.pathsep)
         elif not SCons.Util.is_Sequence(pathlist):
             pathlist = [pathlist]
 
         pl = []
         for p in pathlist:
             try:
-                index = p.find('$')
+                index = string.find(p, '$')
             except (AttributeError, TypeError):
                 type = TYPE_OBJECT
             else:
@@ -131,19 +132,17 @@ class _PathList(object):
                 value = env.subst(value, target=target, source=source,
                                   conv=node_conv)
                 if SCons.Util.is_Sequence(value):
-                    result.extend(SCons.Util.flatten(value))
-                elif value:
-                    result.append(value)
+                    result.extend(value)
+                    continue
+                    
             elif type == TYPE_OBJECT:
                 value = node_conv(value)
-                if value:
-                    result.append(value)
-            elif value:
+            if value:
                 result.append(value)
         return tuple(result)
 
 
-class PathListCache(object):
+class PathListCache:
     """
     A class to handle caching of PathList lookups.
 

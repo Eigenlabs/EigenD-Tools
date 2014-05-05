@@ -5,7 +5,7 @@ The Scanner package for the SCons software construction utility.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,15 +27,16 @@ The Scanner package for the SCons software construction utility.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Scanner/__init__.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Scanner/__init__.py 4577 2009/12/27 19:43:56 scons"
 
 import re
+import string
 
 import SCons.Node.FS
 import SCons.Util
 
 
-class _Null(object):
+class _Null:
     pass
 
 # This is used instead of None as a default argument value so None can be
@@ -55,13 +56,13 @@ def Scanner(function, *args, **kw):
     patterned on SCons code.
     """
     if SCons.Util.is_Dict(function):
-        return Selector(function, *args, **kw)
+        return apply(Selector, (function,) + args, kw)
     else:
-        return Base(function, *args, **kw)
+        return apply(Base, (function,) + args, kw)
 
 
 
-class FindPathDirs(object):
+class FindPathDirs:
     """A class to bind a specific *PATH variable name to a function that
     will return all of the *path directories."""
     def __init__(self, variable):
@@ -79,7 +80,7 @@ class FindPathDirs(object):
 
 
 
-class Base(object):
+class Base:
     """
     The base class for dependency scanners.  This implements
     straightforward, single-pass scanning of a single file.
@@ -91,9 +92,7 @@ class Base(object):
                  argument = _null,
                  skeys = _null,
                  path_function = None,
-                 # Node.FS.Base so that, by default, it's okay for a
-                 # scanner to return a Dir, File or Entry.
-                 node_class = SCons.Node.FS.Base,
+                 node_class = SCons.Node.FS.Entry,
                  node_factory = None,
                  scan_check = None,
                  recursive = None):
@@ -170,7 +169,7 @@ class Base(object):
 
         if skeys is _null:
             if SCons.Util.is_Dict(function):
-                skeys = list(function.keys())
+                skeys = function.keys()
             else:
                 skeys = []
         self.skeys = skeys
@@ -217,7 +216,7 @@ class Base(object):
         nodes = []
         for l in list:
             if self.node_class and not isinstance(l, self.node_class):
-                l = node_factory(l, **kw)
+                l = apply(node_factory, (l,), kw)
             nodes.append(l)
         return nodes
 
@@ -279,9 +278,9 @@ class Selector(Base):
     for custom modules that may be out there.)
     """
     def __init__(self, dict, *args, **kw):
-        Base.__init__(self, None, *args, **kw)
+        apply(Base.__init__, (self, None,)+args, kw)
         self.dict = dict
-        self.skeys = list(dict.keys())
+        self.skeys = dict.keys()
 
     def __call__(self, node, env, path = ()):
         return self.select(node)(node, env, path)
@@ -308,7 +307,7 @@ class Current(Base):
         def current_check(node, env):
             return not node.has_builder() or node.is_up_to_date()
         kw['scan_check'] = current_check
-        Base.__init__(self, *args, **kw)
+        apply(Base.__init__, (self,) + args, kw)
 
 class Classic(Current):
     """
@@ -338,7 +337,7 @@ class Classic(Current):
         kw['skeys'] = suffixes
         kw['name'] = name
 
-        Current.__init__(self, *args, **kw)
+        apply(Current.__init__, (self,) + args, kw)
 
     def find_include(self, include, source_dir, path):
         n = SCons.Node.FS.find_file(include, (source_dir,) + tuple(path))
@@ -359,7 +358,7 @@ class Classic(Current):
             includes = self.find_include_names (node)
             # Intern the names of the include files. Saves some memory
             # if the same header is included many times.
-            node.includes = list(map(SCons.Util.silent_intern, includes))
+            node.includes = map(SCons.Util.silent_intern, includes)
 
         # This is a hand-coded DSU (decorate-sort-undecorate, or
         # Schwartzian transform) pattern.  The sort key is the raw name
@@ -378,9 +377,12 @@ class Classic(Current):
                 SCons.Warnings.warn(SCons.Warnings.DependencyWarning,
                                     "No dependency generated for file: %s (included from: %s) -- file not found" % (i, node))
             else:
-                nodes.append((self.sort_key(include), n))
+                sortkey = self.sort_key(include)
+                nodes.append((sortkey, n))
 
-        return [pair[1] for pair in sorted(nodes)]
+        nodes.sort()
+        nodes = map(lambda pair: pair[1], nodes)
+        return nodes
 
 class ClassicCPP(Classic):
     """
@@ -404,7 +406,7 @@ class ClassicCPP(Classic):
         return n, i
 
     def sort_key(self, include):
-        return SCons.Node.FS._my_normcase(' '.join(include))
+        return SCons.Node.FS._my_normcase(string.join(include))
 
 # Local Variables:
 # tab-width:4

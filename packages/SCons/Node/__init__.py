@@ -20,7 +20,7 @@ be able to depend on any other type of "thing."
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -40,14 +40,15 @@ be able to depend on any other type of "thing."
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
 
-__revision__ = "src/engine/SCons/Node/__init__.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Node/__init__.py 4577 2009/12/27 19:43:56 scons"
 
-import collections
 import copy
-from itertools import chain
+from itertools import chain, izip
+import string
+import UserList
 
-import SCons.Debug
 from SCons.Debug import logInstanceCreation
 import SCons.Executor
 import SCons.Memoize
@@ -56,11 +57,7 @@ import SCons.Util
 from SCons.Debug import Trace
 
 def classname(obj):
-    return str(obj.__class__).split('.')[-1]
-
-# Set to false if we're doing a dry run. There's more than one of these
-# little treats
-do_store_info = True
+    return string.split(str(obj.__class__), '.')[-1]
 
 # Node states
 #
@@ -100,14 +97,9 @@ def do_nothing(node): pass
 
 Annotate = do_nothing
 
-# Gets set to 'True' if we're running in interactive mode. Is
-# currently used to release parts of a target's info during
-# clean builds and update runs (see release_target_info).
-interactive = False
-
 # Classes for signature info for Nodes.
 
-class NodeInfoBase(object):
+class NodeInfoBase:
     """
     The generic base class for signature information for a Node.
 
@@ -115,7 +107,7 @@ class NodeInfoBase(object):
     logic for dealing with their own Node-specific signature information.
     """
     current_version_id = 1
-    def __init__(self, node=None):
+    def __init__(self, node):
         # Create an object attribute from the class attribute so it ends up
         # in the pickled data in the .sconsign file.
         self._version_id = self.current_version_id
@@ -144,7 +136,8 @@ class NodeInfoBase(object):
             try:
                 field_list = self.field_list
             except AttributeError:
-                field_list = sorted(self.__dict__.keys())
+                field_list = self.__dict__.keys()
+                field_list.sort()
         fields = []
         for field in field_list:
             try:
@@ -157,7 +150,7 @@ class NodeInfoBase(object):
             fields.append(f)
         return fields
 
-class BuildInfoBase(object):
+class BuildInfoBase:
     """
     The generic base class for build information for a Node.
 
@@ -168,7 +161,7 @@ class BuildInfoBase(object):
     implicit dependencies, and action information.
     """
     current_version_id = 1
-    def __init__(self, node=None):
+    def __init__(self, node):
         # Create an object attribute from the class attribute so it ends up
         # in the pickled data in the .sconsign file.
         self._version_id = self.current_version_id
@@ -179,7 +172,7 @@ class BuildInfoBase(object):
     def merge(self, other):
         self.__dict__.update(other.__dict__)
 
-class Node(object):
+class Node:
     """The base Node class, for entities that we know how to
     build, or use to build other Nodes.
     """
@@ -189,11 +182,11 @@ class Node(object):
 
     memoizer_counters = []
 
-    class Attrs(object):
+    class Attrs:
         pass
 
     def __init__(self):
-        if SCons.Debug.track_instances: logInstanceCreation(self, 'Node.Node')
+        if __debug__: logInstanceCreation(self, 'Node.Node')
         # Note that we no longer explicitly initialize a self.builder
         # attribute to None here.  That's because the self.builder
         # attribute may be created on-the-fly later by a subclass (the
@@ -214,7 +207,7 @@ class Node(object):
         self.depends_set = set()
         self.ignore = []        # dependencies to ignore
         self.ignore_set = set()
-        self.prerequisites = None
+        self.prerequisites = SCons.Util.UniqueList()
         self.implicit = None    # implicit (scanned) dependencies (None means not scanned yet)
         self.waiting_parents = set()
         self.waiting_s_e = set()
@@ -224,10 +217,8 @@ class Node(object):
         self.env = None
         self.state = no_state
         self.precious = None
-        self.pseudo = False
         self.noclean = 0
         self.nocache = 0
-        self.cached = 0 # is this node pulled from cache?
         self.always_build = None
         self.includes = None
         self.attributes = self.Attrs() # Generic place to stick information about the Node.
@@ -297,8 +288,7 @@ class Node(object):
         except AttributeError:
             pass
         else:
-            if executor is not None:
-                executor.cleanup()
+            executor.cleanup()
 
     def reset_executor(self):
         "Remove cached executor; forces recompute when needed."
@@ -319,7 +309,7 @@ class Node(object):
         so only do thread safe stuff here. Do thread unsafe stuff in
         built().
 
-        Returns true if the node was successfully retrieved.
+        Returns true iff the node was successfully retrieved.
         """
         return 0
 
@@ -358,16 +348,15 @@ class Node(object):
         methods should call this base class method to get the child
         check and the BuildInfo structure.
         """
-        if self.depends is not None:
-            for d in self.depends:
-                if d.missing():
-                    msg = "Explicit dependency `%s' not found, needed by target `%s'."
-                    raise SCons.Errors.StopError(msg % (d, self))
+        for d in self.depends:
+            if d.missing():
+                msg = "Explicit dependency `%s' not found, needed by target `%s'."
+                raise SCons.Errors.StopError, msg % (d, self)
         if self.implicit is not None:
             for i in self.implicit:
                 if i.missing():
                     msg = "Implicit dependency `%s' not found, needed by target `%s'."
-                    raise SCons.Errors.StopError(msg % (i, self))
+                    raise SCons.Errors.StopError, msg % (i, self)
         self.binfo = self.get_binfo()
 
     def build(self, **kw):
@@ -383,7 +372,7 @@ class Node(object):
 
         """
         try:
-            self.get_executor()(self, **kw)
+            apply(self.get_executor(), (self,), kw)
         except SCons.Errors.BuildError, e:
             e.node = self
             raise
@@ -398,13 +387,6 @@ class Node(object):
 
         self.clear()
 
-        if self.pseudo:
-            if self.exists():
-                raise SCons.Errors.UserError("Pseudo target " + str(self) + " must not exist")
-        else:
-            if not self.exists() and do_store_info:
-                SCons.Warnings.warn(SCons.Warnings.TargetNotBuiltWarning,
-                                    "Cannot find target " + str(self) + " after building")
         self.ninfo.update(self)
 
     def visited(self):
@@ -419,23 +401,6 @@ class Node(object):
         else:
             self.ninfo.update(self)
             self.store_info()
-
-    def release_target_info(self):
-        """Called just after this node has been marked
-         up-to-date or was built completely.
-         
-         This is where we try to release as many target node infos
-         as possible for clean builds and update runs, in order
-         to minimize the overall memory consumption.
-         
-         By purging attributes that aren't needed any longer after
-         a Node (=File) got built, we don't have to care that much how
-         many KBytes a Node actually requires...as long as we free
-         the memory shortly afterwards.
-         
-         @see: built() and File.release_target_info()
-         """
-        pass
 
     #
     #
@@ -538,7 +503,7 @@ class Node(object):
 
     def is_derived(self):
         """
-        Returns true if this node is derived (i.e. built).
+        Returns true iff this node is derived (i.e. built).
 
         This should return true only for nodes whose path should be in
         the variant directory when duplicate=0 and should contribute their build
@@ -583,7 +548,8 @@ class Node(object):
         deps = []
         while nodes:
             n = nodes.pop(0)
-            d = [x for x in n.get_found_includes(env, scanner, path) if x not in seen]
+            d = filter(lambda x, seen=seen: not seen.has_key(x),
+                       n.get_found_includes(env, scanner, path))
             if d:
                 deps.extend(d)
                 for n in d:
@@ -666,10 +632,9 @@ class Node(object):
                 if implicit_deps_unchanged or self.is_up_to_date():
                     return
                 # one of this node's sources has changed,
-                # so we must recalculate the implicit deps for all targets
-                for tgt in executor.get_all_targets():
-                    tgt.implicit = []
-                    tgt.implicit_set = set()
+                # so we must recalculate the implicit deps:
+                self.implicit = []
+                self.implicit_set = set()
 
         # Have the executor scan the sources.
         executor.scan_sources(self.builder.source_scanner)
@@ -825,10 +790,6 @@ class Node(object):
         """Set the Node's precious value."""
         self.precious = precious
 
-    def set_pseudo(self, pseudo = True):
-        """Set the Node's precious value."""
-        self.pseudo = pseudo
-
     def set_noclean(self, noclean = 1):
         """Set the Node's noclean value."""
         # Make sure noclean is an integer so the --debug=stree
@@ -871,15 +832,13 @@ class Node(object):
         except TypeError, e:
             e = e.args[0]
             if SCons.Util.is_List(e):
-                s = list(map(str, e))
+                s = map(str, e)
             else:
                 s = str(e)
             raise SCons.Errors.UserError("attempted to add a non-Node dependency to %s:\n\t%s is a %s, not a Node" % (str(self), s, type(e)))
 
     def add_prerequisite(self, prerequisite):
         """Adds prerequisites"""
-        if self.prerequisites is None:
-            self.prerequisites = SCons.Util.UniqueList()
         self.prerequisites.extend(prerequisite)
         self._children_reset()
 
@@ -890,7 +849,7 @@ class Node(object):
         except TypeError, e:
             e = e.args[0]
             if SCons.Util.is_List(e):
-                s = list(map(str, e))
+                s = map(str, e)
             else:
                 s = str(e)
             raise SCons.Errors.UserError("attempted to ignore a non-Node dependency of %s:\n\t%s is a %s, not a Node" % (str(self), s, type(e)))
@@ -904,7 +863,7 @@ class Node(object):
         except TypeError, e:
             e = e.args[0]
             if SCons.Util.is_List(e):
-                s = list(map(str, e))
+                s = map(str, e)
             else:
                 s = str(e)
             raise SCons.Errors.UserError("attempted to add a non-Node as source of %s:\n\t%s is a %s, not a Node" % (str(self), s, type(e)))
@@ -967,14 +926,20 @@ class Node(object):
         # dictionary patterns I found all ended up using "not in"
         # internally anyway...)
         if self.ignore_set:
-            iter = chain.from_iterable(filter(None, [self.sources, self.depends, self.implicit]))
+            if self.implicit is None:
+                iter = chain(self.sources,self.depends)
+            else:
+                iter = chain(self.sources, self.depends, self.implicit)
 
             children = []
             for i in iter:
                 if i not in self.ignore_set:
                     children.append(i)
         else:
-            children = self.all_children(scan=0)
+            if self.implicit is None:
+                children = self.sources + self.depends
+            else:
+                children = self.sources + self.depends + self.implicit
 
         self._memo['children_get'] = children
         return children
@@ -1001,7 +966,10 @@ class Node(object):
         # using dictionary keys, lose the order, and the only ordered
         # dictionary patterns I found all ended up using "not in"
         # internally anyway...)
-        return list(chain.from_iterable(filter(None, [self.sources, self.depends, self.implicit])))
+        if self.implicit is None:
+            return self.sources + self.depends
+        else:
+            return self.sources + self.depends + self.implicit
 
     def children(self, scan=1):
         """Return a list of the node's direct children, minus those
@@ -1049,7 +1017,7 @@ class Node(object):
     def Decider(self, function):
         SCons.Util.AddMethod(self, function, 'changed_since_last_build')
 
-    def changed(self, node=None, allowcache=False):
+    def changed(self, node=None):
         """
         Returns if the node is up-to-date with respect to the BuildInfo
         stored last time it was built.  The default behavior is to compare
@@ -1062,15 +1030,6 @@ class Node(object):
         any difference, but we now rely on checking every dependency
         to make sure that any necessary Node information (for example,
         the content signature of an #included .h file) is updated.
-        
-        The allowcache option was added for supporting the early
-        release of the executor/builder structures, right after
-        a File target was built. When set to true, the return
-        value of this changed method gets cached for File nodes.
-        Like this, the executor isn't needed any longer for subsequent
-        calls to changed().
-        
-        @see: FS.File.changed(), FS.File.release_target_info()
         """
         t = 0
         if t: Trace('changed(%s [%s], %s)' % (self, classname(self), node))
@@ -1094,7 +1053,7 @@ class Node(object):
             if t: Trace(': old %s new %s' % (len(then), len(children)))
             result = True
 
-        for child, prev_ni in zip(children, then):
+        for child, prev_ni in izip(children, then):
             if child.changed_since_last_build(self, prev_ni):
                 if t: Trace(': %s changed' % child)
                 result = True
@@ -1146,18 +1105,17 @@ class Node(object):
         Return a text representation, suitable for displaying to the
         user, of the include tree for the sources of this node.
         """
-        if self.is_derived():
+        if self.is_derived() and self.env:
             env = self.get_build_env()
-            if env:
-                for s in self.sources:
-                    scanner = self.get_source_scanner(s)
-                    if scanner:
-                        path = self.get_build_scanner_path(scanner)
-                    else:
-                        path = None
-                    def f(node, env=env, scanner=scanner, path=path):
-                        return node.get_found_includes(env, scanner, path)
-                    return SCons.Util.render_tree(s, f, 1)
+            for s in self.sources:
+                scanner = self.get_source_scanner(s)
+                if scanner:
+                    path = self.get_build_scanner_path(scanner)
+                else:
+                    path = None
+                def f(node, env=env, scanner=scanner, path=path):
+                    return node.get_found_includes(env, scanner, path)
+                return SCons.Util.render_tree(s, f, 1)
         else:
             return None
 
@@ -1241,8 +1199,8 @@ class Node(object):
         new_bkids    = new.bsources    + new.bdepends    + new.bimplicit
         new_bkidsigs = new.bsourcesigs + new.bdependsigs + new.bimplicitsigs
 
-        osig = dict(zip(old_bkids, old_bkidsigs))
-        nsig = dict(zip(new_bkids, new_bkidsigs))
+        osig = dict(izip(old_bkids, old_bkidsigs))
+        nsig = dict(izip(new_bkids, new_bkidsigs))
 
         # The sources and dependencies we'll want to report are all stored
         # as relative paths to this target's directory, but we want to
@@ -1257,11 +1215,11 @@ class Node(object):
 
         lines = []
 
-        removed = [x for x in old_bkids if not x in new_bkids]
+        removed = filter(lambda x, nk=new_bkids: not x in nk, old_bkids)
         if removed:
-            removed = list(map(stringify, removed))
+            removed = map(stringify, removed)
             fmt = "`%s' is no longer a dependency\n"
-            lines.extend([fmt % s for s in removed])
+            lines.extend(map(lambda s, fmt=fmt: fmt % s, removed))
 
         for k in new_bkids:
             if not k in old_bkids:
@@ -1271,14 +1229,14 @@ class Node(object):
 
         if len(lines) == 0 and old_bkids != new_bkids:
             lines.append("the dependency order changed:\n" +
-                         "%sold: %s\n" % (' '*15, list(map(stringify, old_bkids))) +
-                         "%snew: %s\n" % (' '*15, list(map(stringify, new_bkids))))
+                         "%sold: %s\n" % (' '*15, map(stringify, old_bkids)) +
+                         "%snew: %s\n" % (' '*15, map(stringify, new_bkids)))
 
         if len(lines) == 0:
             def fmt_with_title(title, strlines):
-                lines = strlines.split('\n')
+                lines = string.split(strlines, '\n')
                 sep = '\n' + ' '*(15 + len(title))
-                return ' '*15 + title + sep.join(lines) + '\n'
+                return ' '*15 + title + string.join(lines, sep) + '\n'
             if old.bactsig != new.bactsig:
                 if old.bact == new.bact:
                     lines.append("the contents of the build action changed\n" +
@@ -1296,22 +1254,31 @@ class Node(object):
             return "%s %s"  % (preamble, lines[0])
         else:
             lines = ["%s:\n" % preamble] + lines
-            return ( ' '*11).join(lines)
+            return string.join(lines, ' '*11)
 
-class NodeList(collections.UserList):
-    def __str__(self):
-        return str(list(map(str, self.data)))
+try:
+    [].extend(UserList.UserList([]))
+except TypeError:
+    # Python 1.5.2 doesn't allow a list to be extended by list-like
+    # objects (such as UserList instances), so just punt and use
+    # real lists.
+    def NodeList(l):
+        return l
+else:
+    class NodeList(UserList.UserList):
+        def __str__(self):
+            return str(map(str, self.data))
 
 def get_children(node, parent): return node.children()
 def ignore_cycle(node, stack): pass
 def do_nothing(node, parent): pass
 
-class Walker(object):
+class Walker:
     """An iterator for walking a Node tree.
 
     This is depth-first, children are visited before the parent.
     The Walker object can be initialized with any node, and
-    returns the next node on the descent with each get_next() call.
+    returns the next node on the descent with each next() call.
     'kids_func' is an optional function that will be called to
     get the children of a node instead of calling 'children'.
     'cycle_func' is an optional function that will be called
@@ -1331,7 +1298,7 @@ class Walker(object):
         self.history = {} # used to efficiently detect and avoid cycles
         self.history[node] = None
 
-    def get_next(self):
+    def next(self):
         """Return the next node for this walk of the tree.
 
         This function is intentionally iterative, not recursive,
@@ -1343,7 +1310,7 @@ class Walker(object):
                 node = self.stack[-1].wkids.pop(0)
                 if not self.stack[-1].wkids:
                     self.stack[-1].wkids = None
-                if node in self.history:
+                if self.history.has_key(node):
                     self.cycle_func(node, self.stack)
                 else:
                     node.wkids = copy.copy(self.kids_func(node, self.stack[-1]))

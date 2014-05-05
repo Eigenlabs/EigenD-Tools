@@ -9,7 +9,7 @@ selection method.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -29,8 +29,9 @@ selection method.
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
 
-__revision__ = "src/engine/SCons/Tool/dvipdf.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Tool/dvipdf.py 4577 2009/12/27 19:43:56 scons"
 
 import SCons.Action
 import SCons.Defaults
@@ -87,7 +88,7 @@ def PDFEmitter(target, source, env):
     """
     def strip_suffixes(n):
         return not SCons.Util.splitext(str(n))[1] in ['.aux', '.log']
-    source = list(filter(strip_suffixes, source))
+    source = filter(strip_suffixes, source)
     return (target, source)
 
 def generate(env):
@@ -115,7 +116,6 @@ def generate(env):
     env['PDFCOM']      = ['$DVIPDFCOM']
 
 def exists(env):
-    SCons.Tool.tex.generate_darwin(env)
     return env.Detect('dvipdf')
 
 # Local Variables:

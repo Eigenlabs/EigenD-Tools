@@ -7,7 +7,7 @@ Phar Lap ETS tool chain.  Right now, this is linkloc and
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -29,13 +29,14 @@ Phar Lap ETS tool chain.  Right now, this is linkloc and
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/PharLapCommon.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Tool/PharLapCommon.py 4577 2009/12/27 19:43:56 scons"
 
 import os
 import os.path
 import SCons.Errors
 import SCons.Util
 import re
+import string
 
 def getPharLapPath():
     """Reads the registry to find the installed path of the Phar Lap ETS
@@ -45,7 +46,7 @@ def getPharLapPath():
     be found."""
 
     if not SCons.Util.can_read_reg:
-        raise SCons.Errors.InternalError("No Windows registry module was found")
+        raise SCons.Errors.InternalError, "No Windows registry module was found"
     try:
         k=SCons.Util.RegOpenKeyEx(SCons.Util.HKEY_LOCAL_MACHINE,
                                   'SOFTWARE\\Pharlap\\ETS')
@@ -61,7 +62,7 @@ def getPharLapPath():
                     
         return os.path.normpath(val)
     except SCons.Util.RegError:
-        raise SCons.Errors.UserError("Cannot find Phar Lap ETS path in the registry.  Is it installed properly?")
+        raise SCons.Errors.UserError, "Cannot find Phar Lap ETS path in the registry.  Is it installed properly?"
 
 REGEX_ETS_VER = re.compile(r'#define\s+ETS_VER\s+([0-9]+)')
 
@@ -78,7 +79,7 @@ def getPharLapVersion():
 
     include_path = os.path.join(getPharLapPath(), os.path.normpath("include/embkern.h"))
     if not os.path.exists(include_path):
-        raise SCons.Errors.UserError("Cannot find embkern.h in ETS include directory.\nIs Phar Lap ETS installed properly?")
+        raise SCons.Errors.UserError, "Cannot find embkern.h in ETS include directory.\nIs Phar Lap ETS installed properly?"
     mo = REGEX_ETS_VER.search(open(include_path, 'r').read())
     if mo:
         return int(mo.group(1))
@@ -96,14 +97,14 @@ def addPathIfNotExists(env_dict, key, path, sep=os.pathsep):
         is_list = 1
         paths = env_dict[key]
         if not SCons.Util.is_List(env_dict[key]):
-            paths = paths.split(sep)
+            paths = string.split(paths, sep)
             is_list = 0
-        if os.path.normcase(path) not in list(map(os.path.normcase, paths)):
+        if not os.path.normcase(path) in map(os.path.normcase, paths):
             paths = [ path ] + paths
         if is_list:
             env_dict[key] = paths
         else:
-            env_dict[key] = sep.join(paths)
+            env_dict[key] = string.join(paths, sep)
     except KeyError:
         env_dict[key] = path
 

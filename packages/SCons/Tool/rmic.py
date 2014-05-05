@@ -9,7 +9,7 @@ selection method.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -31,9 +31,10 @@ selection method.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-__revision__ = "src/engine/SCons/Tool/rmic.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Tool/rmic.py 4577 2009/12/27 19:43:56 scons"
 
 import os.path
+import string
 
 import SCons.Action
 import SCons.Builder
@@ -85,7 +86,7 @@ def emit_rmic_classes(target, source, env):
     tlist = []
     for s in source:
         for suff in stub_suffixes:
-            fname = s.attributes.java_classname.replace('.', os.sep) + \
+            fname = string.replace(s.attributes.java_classname, '.', os.sep) + \
                     suff + class_suffix
             t = target[0].File(fname)
             t.attributes.java_lookupdir = target[0]
@@ -111,13 +112,7 @@ def generate(env):
     env['JAVACLASSSUFFIX']  = '.class'
 
 def exists(env):
-    # As reported by Jan Nijtmans in issue #2730, the simple
-    #    return env.Detect('rmic')
-    # doesn't always work during initialization. For now, we
-    # stop trying to detect an executable (analogous to the
-    # javac Builder).
-    # TODO: Come up with a proper detect() routine...and enable it.
-    return 1
+    return env.Detect('rmic')
 
 # Local Variables:
 # tab-width:4

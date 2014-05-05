@@ -4,7 +4,7 @@ The msi packager.
 """
 
 #
-# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 The SCons Foundation
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 The SCons Foundation
 # 
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -24,8 +24,9 @@ The msi packager.
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
 
-__revision__ = "src/engine/SCons/Tool/packaging/msi.py  2014/03/02 14:18:15 garyo"
+__revision__ = "src/engine/SCons/Tool/packaging/msi.py 4577 2009/12/27 19:43:56 scons"
 
 import os
 import SCons
@@ -64,14 +65,14 @@ def convert_to_id(s, id_set):
     charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYabcdefghijklmnopqrstuvwxyz0123456789_.'
     if s[0] in '0123456789.':
         s += '_'+s
-    id = [c for c in s if c in charset]
+    id = filter( lambda c : c in charset, s )
 
     # did we already generate an id for this file?
     try:
         return id_set[id][s]
     except KeyError:
         # no we did not so initialize with the id
-        if id not in id_set: id_set[id] = { s : id }
+        if not id_set.has_key(id): id_set[id] = { s : id }
         # there is a collision, generate an id which is unique by appending
         # the collision number
         else: id_set[id][s] = id + str(len(id_set[id]))
@@ -108,7 +109,7 @@ def gen_dos_short_file_name(file, filename_set):
 
     # strip forbidden characters.
     forbidden = '."/[]:;=, '
-    fname = [c for c in fname if c not in forbidden]
+    fname = filter( lambda c : c not in forbidden, fname )
 
     # check if we already generated a filename with the same number:
     # thisis1.txt, thisis2.txt etc.
@@ -136,7 +137,7 @@ def create_feature_dict(files):
             feature = [ feature ]
 
         for f in feature:
-            if f not in dict:
+            if not dict.has_key( f ):
                 dict[ f ] = [ file ]
             else:
                 dict[ f ].append( file )
@@ -213,7 +214,7 @@ def build_wxsfile(target, source, env):
         file.write( doc.toprettyxml() )
 
         # call a user specified function
-        if 'CHANGE_SPECFILE' in env:
+        if env.has_key('CHANGE_SPECFILE'):
             env['CHANGE_SPECFILE'](target, source)
 
     except KeyError, e:
@@ -295,11 +296,9 @@ def build_wxsfile_file_section(root, files, NAME, VERSION, VENDOR, filename_set,
         upper_dir = ''
 
         # walk down the xml tree finding parts of the directory
-        dir_parts = [d for d in dir_parts if d != '']
+        dir_parts = filter( lambda d: d != '', dir_parts )
         for d in dir_parts[:]:
-            already_created = [c for c in Directory.childNodes
-                               if c.nodeName == 'Directory'
-                               and c.attributes['LongName'].value == escape(d)] 
+            already_created = filter( lambda c: c.nodeName == 'Directory' and c.attributes['LongName'].value == escape(d), Directory.childNodes ) 
 
             if already_created != []:
                 Directory = already_created[0]
@@ -465,7 +464,7 @@ def build_wxsfile_header_section(root, spec):
     Product.childNodes.append( Package )
 
     # set "mandatory" default values
-    if 'X_MSI_LANGUAGE' not in spec:
+    if not spec.has_key('X_MSI_LANGUAGE'):
         spec['X_MSI_LANGUAGE'] = '1033' # select english
 
     # mandatory sections, will throw a KeyError if the tag is not available
@@ -476,10 +475,10 @@ def build_wxsfile_header_section(root, spec):
     Package.attributes['Description']  = escape( spec['SUMMARY'] )
 
     # now the optional tags, for which we avoid the KeyErrror exception
-    if 'DESCRIPTION' in spec:
+    if spec.has_key( 'DESCRIPTION' ):
         Package.attributes['Comments'] = escape( spec['DESCRIPTION'] )
 
-    if 'X_MSI_UPGRADE_CODE' in spec:
+    if spec.has_key( 'X_MSI_UPGRADE_CODE' ):
         Package.attributes['X_MSI_UPGRADE_CODE'] = escape( spec['X_MSI_UPGRADE_CODE'] )
 
     # We hardcode the media tag as our current model cannot handle it.
@@ -512,7 +511,7 @@ def package(env, target, source, PACKAGEROOT, NAME, VERSION,
 
     # put the arguments into the env and call the specfile builder.
     env['msi_spec'] = kw
-    specfile = wxs_builder(* [env, target, source], **kw)
+    specfile = apply( wxs_builder, [env, target, source], kw )
 
     # now call the WiX Tool with the built specfile added as a source.
     msifile  = env.WiX(target, specfile)
